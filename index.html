@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sổ Tay 3D - Nút Xóa Siêu Nhạy</title>
+    <title>Sổ Tay 3D - Bảo Mật & Đồng Bộ Realtime</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
     
@@ -101,17 +101,15 @@
         .element { position: absolute; cursor: move; padding: 5px; border: 1px dashed transparent; }
         .element.selected { border: 2px solid var(--primary); background: rgba(99, 102, 241, 0.04); z-index: 999; }
         
-        /* ĐÃ TỐI ƯU: NÚT XÓA SIÊU NHẠY VỚI HITBOX RỘNG VÀ PHẢN HỒI CƠ HỌC TỨC THÌ */
         .element .delete-btn {
             position: absolute; top: -14px; right: -14px; background: #ef4444; color: white;
             border-radius: 50%; width: 22px; height: 22px; font-size: 11px; display: none;
             align-items: center; justify-content: center; cursor: pointer; z-index: 1000;
-            font-weight: bold;
-            padding: 4px; box-sizing: content-box; /* Tăng diện tích nhận diện chạm mà không vỡ layout */
+            font-weight: bold; padding: 4px; box-sizing: content-box;
             transition: background 0.1s ease, transform 0.05s ease;
         }
         .element .delete-btn:hover { background: #dc2626; transform: scale(1.1); }
-        .element .delete-btn:active { transform: scale(0.9); } /* Phản hồi lún xuống tức thì */
+        .element .delete-btn:active { transform: scale(0.9); }
         .element.selected .delete-btn { display: flex; }
 
         .element-text { font-size: 18px; outline: none; word-break: break-word; user-select: text; min-width: 60px; line-height: 1.4; color: #000; }
@@ -139,8 +137,9 @@
         <h2><i class="fa-solid fa-book-open" style="color:var(--primary)"></i> Sổ Tay 3D Cao Cấp</h2>
         
         <div class="section" style="background: #1e1b4b; border-color: #4338ca;">
-            <span class="label"><i class="fa-solid fa-earth-asia"></i> Chế độ phòng:</span>
-            <div style="font-weight: bold; color: #10b981;"><i class="fa-solid fa-unlock"></i> Ai có link cũng có thể chỉnh sửa</div>
+            <span class="label"><i class="fa-solid fa-lock"></i> Chế độ riêng tư:</span>
+            <div style="font-size: 12px; margin-bottom: 8px; color: #cbd5e1;">Chỉ người có liên kết bí mật bên dưới mới có thể truy cập và chỉnh sửa.</div>
+            <button class="btn btn-secondary" onclick="copySecretLink()"><i class="fa-solid fa-copy"></i> Sao chép liên kết bí mật</button>
         </div>
 
         <div class="section" id="coverConfigSection" style="display:none; background: #2e1065; border-color: #6b21a8;">
@@ -240,7 +239,7 @@
     <div class="workspace">
         <div class="room-bar">
             <span id="statusBadge" style="color: #10b981;"><i class="fa-solid fa-circle"></i> Trực tuyến Realtime</span>
-            <span id="roomDisplay" style="color: #94a3b8;">Mã phòng: ...</span>
+            <span id="roomDisplay" style="color: #94a3b8; font-size:11px;">Mã bảo mật: Đang khởi tạo...</span>
         </div>
 
         <div class="page-navigation">
@@ -265,7 +264,7 @@
     <script>
         let ably = new Ably.Realtime('h3sO_g.W8vN2A:vLbe_Z6u1ZfscwM-N-iO7R7mS4X8g17oNOnK7952jXw');
         let channel = null;
-        let roomCode = '888999';
+        let roomCode = '';
         let selectedId = null;
         let userActiveSide = 'left'; 
 
@@ -288,11 +287,23 @@
             "fa-rocket", "fa-paper-plane", "fa-earth-americas", "fa-compass", "fa-anchor", "fa-bicycle", "fa-car", "fa-plane"
         ];
 
+        // ĐÃ CẬP NHẬT: Tạo mã phòng ngẫu nhiên bảo mật cao nếu chưa có link phòng
         function initAppConfig() {
             const urlParams = new URLSearchParams(window.location.search);
-            const roomParam = urlParams.get('room');
-            if (roomParam) roomCode = roomParam;
+            let roomParam = urlParams.get('room');
+            
+            if (!roomParam) {
+                // Tạo chuỗi bảo mật ngẫu nhiên gồm chữ và số để làm khóa riêng tư
+                roomParam = 'room_' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9);
+                window.history.replaceState({}, document.title, window.location.pathname + "?room=" + roomParam);
+            }
+            roomCode = roomParam;
             renderStickerLibrary();
+        }
+
+        function copySecretLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Đã sao chép liên kết bí mật thành công! Hãy gửi link này cho thiết bị khác hoặc người bạn muốn cho phép truy cập.");
         }
 
         function renderStickerLibrary() {
@@ -309,7 +320,7 @@
 
         function connectRealtime() {
             channel = ably.channels.get('sotay_3d_premium_v2_' + roomCode);
-            document.getElementById("roomDisplay").innerText = "Mã phòng: " + roomCode;
+            document.getElementById("roomDisplay").innerText = "Mã bảo mật: " + roomCode;
 
             channel.subscribe('update', (msg) => {
                 notebook.pages = msg.data.pages;
@@ -435,10 +446,9 @@
             let del = document.createElement("div");
             del.className = "delete-btn"; del.innerHTML = "X";
             
-            // ĐÃ NÂNG CẤP: Chuyển sang sự kiện mousedown để kích hoạt phản hồi xóa ngay lập tức
             del.addEventListener("mousedown", (e) => {
                 e.stopPropagation();
-                e.preventDefault(); // Ngăn lỗi click nhầm lấy tiêu điểm kéo thả
+                e.preventDefault();
                 delete notebook.pages[pageIndex].elements[data.id];
                 selectedId = null;
                 document.getElementById("editorPanel").style.display = 'none';
@@ -543,7 +553,8 @@
             }
         }
 
-        function allowDrop(e) { e.preventDefault(); }
+        allowDrop = (e) => e.preventDefault();
+        
         function dropElement(e) {
             e.preventDefault();
             let id = e.dataTransfer.getData("text/plain");
